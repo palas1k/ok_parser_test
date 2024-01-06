@@ -27,26 +27,27 @@ data = {
 url = "https://ok.ru/dk?cmd=AnonymLogin&st.cmd=anonymMain"
 
 
-class Decor:
-    def __init__(self, arg):
-        self._arg = arg
+def logged_check(func):
+    async def wrapped(*args):
+        resp = await func(*args)
+        if ConnectToOk().session is not None:
+            return resp
+        else:
+            return None
 
-    def __call__(self):
-        def wrapper(func):
-            resp = func()
-            if resp.cookies.get("AUTHCODE") is not None:
-                return resp
-            else:
-                print("Not logged")
+    return wrapped
 
 
 class ConnectToOk:
+    session = None
 
-    async def login_to_ok(self):
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url=url, data=data) as response:
-                #return response.text()
-                return response
+    def start_session(self):
+        self.session = aiohttp.ClientSession()
+        return self
+
+    async def stop_session(self):
+        await self.session.close()
+        self.session = None
 
 
 class OkParser(ConnectToOk):
@@ -65,31 +66,39 @@ class OkParser(ConnectToOk):
             'st.password': password,
         }
 
-
+    @logged_check
     async def check_messages(self) -> str:
-        resp_data = await self.login_to_ok()
+        resp_data = await self.start_session().session.post(url=url, data=data)
         resp_data = await resp_data.text()
         soup = BeautifulSoup(resp_data, "html.parser")
         answer = soup.find(id='counter_ToolbarMessages').text
         print(f"Новых сообщений: {answer}")
+        await self.stop_session()
         # return answer
 
+    @logged_check
     async def check_notifications(self) -> str:
-        soup = BeautifulSoup(await self.login_to_ok(self.url, self.data), "html.parser")
+        resp_data = await self.start_session().session.post(url=url, data=data)
+        resp_data = await resp_data.text()
+        soup = BeautifulSoup(resp_data, "html.parser")
         answer = soup.find(id='counter_Notifications').text
-        print(f"Новых оповещений: {answer}")
+        if answer != '':
+            print(f"Новых оповещений: {answer}")
+        else:
+            print("Новых оповещений нет")
+        await self.stop_session()
         # return answer
 
-
+#
 runner = OkParser()
 asyncio.run(runner.check_messages())
 
-@Decor
+@logged_check
 async def hobby_to_ok():
     async with aiohttp.ClientSession() as session:
         async with session.post(url='https://ok.ru/hobby') as response:
             print(response.cookies.get("AUTHCODE"))
             return await response.text()
 
-#
+
 # asyncio.run(hobby_to_ok())
