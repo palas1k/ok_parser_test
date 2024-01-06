@@ -45,6 +45,7 @@ class ConnectToOk:
     async def login_to_ok(self):
         async with aiohttp.ClientSession() as session:
             async with session.post(url=url, data=data) as response:
+                #return response.text()
                 return response
 
 
