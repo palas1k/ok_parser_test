@@ -45,7 +45,7 @@ class ConnectToOk:
         return aiohttp.ClientSession()
 
     async def stop_session(self):
-        return self.session.close()
+        return await self.session.close()
 
     # post
     async def get_data(self):
