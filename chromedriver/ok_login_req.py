@@ -13,7 +13,6 @@ login = os.getenv("LOGIN_PHONE")
 password = os.getenv("PASSWORD")
 
 
-
 def logged_check(func):
     async def wrapped(*args):
         resp = await func(*args)
@@ -42,10 +41,25 @@ class Auth:
 
     url = "https://ok.ru/dk?cmd=AnonymLogin&st.cmd=anonymMain"
 
-    @logged_check
+    # @logged_check
     def start_session(self):
-        self.session = aiohttp.ClientSession().post(url=self.url, data=self.data)
+        print(self.session)
+        self.session = aiohttp.ClientSession()
         return self.session
+
+    @logged_check
+    def get_data(self):
+        conn = self.start_session()
+        r = conn.post(url=self.url, data=self.data)
+        return r
+
+    async def session_close(self):
+        if self.session is not None:
+            print(self.session)
+            await self.session.close()
+            self.session = None
+            print("Session close")
+            print(self.session)
 
 
 class OkParser:
@@ -54,18 +68,17 @@ class OkParser:
         self.auth_session = Auth()
 
     async def get_data(self):
-        obj = await self.auth_session.start_session()
+        print('Перед получением данных')
+        obj = await self.auth_session.get_data()
+        print("Получение данных")
+        await self.auth_session.session_close()
         return await obj.text()
-
 
     async def check_messages(self) -> str:
         resp_data = await self.get_data()
         soup = BeautifulSoup(resp_data, "html.parser")
         answer = soup.find(id='counter_ToolbarMessages').text
         print(f"Новых сообщений: {answer}")
-        self.auth_session.start_session().close()
-        # return answer
-
 
     async def check_notifications(self) -> str:
         resp_data = await self.get_data()
@@ -75,12 +88,8 @@ class OkParser:
             print(f"Новых оповещений: {answer}")
         else:
             print("Новых оповещений нет")
-        await self.auth_session.close()
-        # return answer
+        await self.auth_session.session_close()
 
 
 runner = OkParser()
 asyncio.run(runner.check_messages())
-
-# runner = ConnectToOk()
-# asyncio.run(runner.auth_to_ok())
