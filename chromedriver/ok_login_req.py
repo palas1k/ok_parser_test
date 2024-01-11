@@ -14,13 +14,12 @@ password = os.getenv("PASSWORD")
 
 
 def logged_check(func):
-    async def wrapped(*args):
-        resp = await func(*args)
-        if resp is not None:
-            return resp
-        else:
-            print("Non logged")
-            return None
+    async def wrapped(self, *args):
+        r = await func(self, *args)
+        if self.session is None:
+            raise Exception("Non logged")
+
+        return r
 
     return wrapped
 
@@ -41,7 +40,6 @@ class Auth:
 
     url = "https://ok.ru/dk?cmd=AnonymLogin&st.cmd=anonymMain"
 
-    # @logged_check
     def start_session(self):
         print(self.session)
         self.session = aiohttp.ClientSession()
@@ -70,9 +68,10 @@ class OkParser:
     async def get_data(self):
         print('Перед получением данных')
         obj = await self.auth_session.get_data()
+        obj = await obj.text()
         print("Получение данных")
         await self.auth_session.session_close()
-        return await obj.text()
+        return obj
 
     async def check_messages(self) -> str:
         resp_data = await self.get_data()
@@ -92,4 +91,8 @@ class OkParser:
 
 
 runner = OkParser()
-asyncio.run(runner.check_messages())
+
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+loop.run_until_complete(runner.check_messages())
+
